@@ -4,12 +4,11 @@
   "description": "Your Figma Plugin",
   "main": "code.js",
   "scripts": {
-    "setup": "node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json'));m.name='Oscillator-'+process.env.CONDUCTOR_WORKSPACE_NAME;fs.writeFileSync('manifest.json',JSON.stringify(m,null,2));\"",
+    "setup": "node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json'));m.name='Oscillator-'+process.env.CONDUCTOR_WORKSPACE_NAME;fs.writeFileSync('manifest.json',JSON.stringify(m,null,2));\" && npm run watch",
     "build": "tsc -p tsconfig.json",
-    "lint": "eslint --ext .ts,.tsx --ignore-pattern node_modules .",
-    "lint:fix": "eslint --ext .ts,.tsx --ignore-pattern node_modules --fix .",
     "watch": "npm run build -- --watch",
-    "dev": "npm run build -- --watch"
+    "lint": "eslint --ext .ts,.tsx --ignore-pattern node_modules .",
+    "lint:fix": "eslint --ext .ts,.tsx --ignore-pattern node_modules --fix ."
   },
   "author": "",
   "license": "",
