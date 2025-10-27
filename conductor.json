@@ -1,7 +1,8 @@
 {
-  "transforms": {
-    "manifest.json": {
-      "name": "{{name}} - $CONDUCTOR_WORKSPACE_NAME"
-    }
-  }
+  "scripts": {
+    "setup": "pnpm run setup",
+    "run": "pnpm run dev",
+    "archive": "rm -rf \"$HOME/Library/Application Support/com.conductor.app.dev.$CONDUCTOR_WORKSPACE_NAME\""
+  },
+  "runScriptMode": "concurrent"
 }
