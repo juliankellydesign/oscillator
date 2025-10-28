@@ -4,9 +4,9 @@
   "description": "Your Figma Plugin",
   "main": "code.js",
   "scripts": {
-    "setup": "npm install && node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json'));m.name='Oscillator-'+process.env.CONDUCTOR_WORKSPACE_NAME;fs.writeFileSync('manifest.json',JSON.stringify(m,null,2));\" && npm run watch",
+    "setup": "pnpm install && node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json'));m.name='Oscillator-'+process.env.CONDUCTOR_WORKSPACE_NAME;fs.writeFileSync('manifest.json',JSON.stringify(m,null,2));\" && pnpm run watch",
     "build": "tsc -p tsconfig.json",
-    "watch": "npm run build -- --watch"
+    "watch": "pnpm run build -- --watch"
   },
   "author": "",
   "license": "",
