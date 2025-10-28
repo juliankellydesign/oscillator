@@ -107,6 +107,6 @@ function generateWavePath(params: { waveLength: number; waveHeight: number; wave
   
   return {
     data: pathData,
-    windingRule: "NONZERO"
+    windingRule: "NONZERO" as const
   };
 }
