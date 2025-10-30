@@ -144,13 +144,23 @@
       </div>
       <input type="range" id="waveRoundness" min="0" max="100" value="50">
     </div>
-    
+
     <div class="control-group">
       <div class="control-label">
         <span class="control-name">Wave Offset</span>
         <span class="control-value" id="waveOffset-value">0%</span>
       </div>
       <input type="range" id="waveOffset" min="-100" max="100" value="0">
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <div class="control-group">
+      <div class="control-label">
+        <span class="control-name">Number of Waves</span>
+        <span class="control-value" id="numWaves-value">4</span>
+      </div>
+      <input type="range" id="numWaves" min="1" max="10" value="4">
     </div>
   </div>
   
@@ -176,19 +186,22 @@
     const waveHeightSlider = document.getElementById('waveHeight');
     const waveRoundnessSlider = document.getElementById('waveRoundness');
     const waveOffsetSlider = document.getElementById('waveOffset');
-    
+    const numWavesSlider = document.getElementById('numWaves');
+
     // Value displays
     const waveLengthValue = document.getElementById('waveLength-value');
     const waveHeightValue = document.getElementById('waveHeight-value');
     const waveRoundnessValue = document.getElementById('waveRoundness-value');
     const waveOffsetValue = document.getElementById('waveOffset-value');
-    
+    const numWavesValue = document.getElementById('numWaves-value');
+
     // Initialize with default values
     let params = {
       waveLength: parseInt(waveLengthSlider.value),
       waveHeight: parseInt(waveHeightSlider.value),
       waveRoundness: parseInt(waveRoundnessSlider.value),
-      waveOffset: parseInt(waveOffsetSlider.value)
+      waveOffset: parseInt(waveOffsetSlider.value),
+      numWaves: parseInt(numWavesSlider.value)
     };
     
     // Update value displays
@@ -197,6 +210,7 @@
       waveHeightValue.textContent = params.waveHeight + 'px';
       waveRoundnessValue.textContent = params.waveRoundness + '%';
       waveOffsetValue.textContent = params.waveOffset + '%';
+      numWavesValue.textContent = params.numWaves;
     }
     
     // Event listeners
@@ -223,7 +237,13 @@
       updateValues();
       drawWave();
     });
-    
+
+    numWavesSlider.addEventListener('input', (e) => {
+      params.numWaves = parseInt(e.target.value);
+      updateValues();
+      drawWave();
+    });
+
     // Draw the wave preview
     function drawWave() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -232,10 +252,9 @@
       const padding = 50;
       const startX = padding;
       const endX = canvas.width - padding;
-      const numWaves = 4;
-      
+
       // Scale the wave to fit in preview
-      const totalWaveLength = params.waveLength * numWaves;
+      const totalWaveLength = params.waveLength * params.numWaves;
       const scaleFactor = Math.min((endX - startX) / totalWaveLength, (canvas.height - padding * 2) / (params.waveHeight * 2));
       const scaledWaveLength = params.waveLength * scaleFactor;
       const scaledWaveHeight = params.waveHeight * scaleFactor;
@@ -254,7 +273,7 @@
       ctx.moveTo(startX, bottomY);
       
       // Draw each wave segment
-      for (let i = 0; i < numWaves; i++) {
+      for (let i = 0; i < params.numWaves; i++) {
         const waveStartX = startX + i * scaledWaveLength;
         const waveMidX = waveStartX + scaledWaveLength / 2;
         const waveEndX = waveStartX + scaledWaveLength;

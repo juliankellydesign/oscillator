@@ -28,8 +28,7 @@ figma.ui.onmessage = (msg: { type: string; params?: any }) => {
     };
     
     // Calculate dimensions
-    const numWaves = 4;
-    const totalWidth = params.waveLength * numWaves;
+    const totalWidth = params.waveLength * params.numWaves;
     const totalHeight = params.waveHeight * 2;
     
     // Position the vector at the center
@@ -55,8 +54,8 @@ function formatSVGNumber(num: number): string {
   return Math.round(num * 100) / 100 + '';
 }
 
-function generateWavePath(params: { waveLength: number; waveHeight: number; waveRoundness: number; waveOffset: number }) {
-  const numWaves = 4;
+function generateWavePath(params: { waveLength: number; waveHeight: number; waveRoundness: number; waveOffset: number; numWaves: number }) {
+  const numWaves = params.numWaves;
   const waveLength = params.waveLength;
   const waveHeight = params.waveHeight;
   const roundness = params.waveRoundness / 100;
@@ -92,15 +91,15 @@ function generateWavePath(params: { waveLength: number; waveHeight: number; wave
     const cp2x = topX - handleReach;
     const cp2y = 0;
 
-    pathData += ` C ${formatSVGNumber(cp1x)} ${formatSVGNumber(cp1y)}, ${formatSVGNumber(cp2x)} ${formatSVGNumber(cp2y)}, ${formatSVGNumber(topX)} ${formatSVGNumber(topY)}`;
+    pathData += ` C ${formatSVGNumber(cp1x)} ${formatSVGNumber(cp1y)} ${formatSVGNumber(cp2x)} ${formatSVGNumber(cp2y)} ${formatSVGNumber(topX)} ${formatSVGNumber(topY)}`;
 
     // Second curve: from top point to wave end
     const cp3x = topX + handleReach;
     const cp3y = 0;
     const cp4x = bottomX - handleReach;
     const cp4y = waveHeight * 2;
-    
-    pathData += ` C ${formatSVGNumber(cp3x)} ${formatSVGNumber(cp3y)}, ${formatSVGNumber(cp4x)} ${formatSVGNumber(cp4y)}, ${formatSVGNumber(bottomX)} ${formatSVGNumber(bottomY)}`;
+
+    pathData += ` C ${formatSVGNumber(cp3x)} ${formatSVGNumber(cp3y)} ${formatSVGNumber(cp4x)} ${formatSVGNumber(cp4y)} ${formatSVGNumber(bottomX)} ${formatSVGNumber(bottomY)}`;
   }
   
   return {
