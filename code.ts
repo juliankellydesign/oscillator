@@ -83,23 +83,21 @@ function generateWavePath(params: { waveLength: number; waveHeight: number; wave
     const bottomX = waveEndX;
     const bottomY = waveHeight * 2;
     
-    // Calculate bezier handle positions with constraints
+    // Calculate bezier handle positions
     const handleReach = roundness * (waveLength / 2);
     
     // First curve: from wave start to top point
-    // Control points should stay within [waveStartX, topX]
-    const cp1x = Math.min(Math.max(waveStartX, waveStartX + handleReach), topX);
+    const cp1x = waveStartX + handleReach;
     const cp1y = waveHeight * 2;
-    const cp2x = Math.max(Math.min(topX - handleReach, topX), waveStartX);
+    const cp2x = topX - handleReach;
     const cp2y = 0;
-    
+
     pathData += ` C ${formatSVGNumber(cp1x)} ${formatSVGNumber(cp1y)}, ${formatSVGNumber(cp2x)} ${formatSVGNumber(cp2y)}, ${formatSVGNumber(topX)} ${formatSVGNumber(topY)}`;
-    
+
     // Second curve: from top point to wave end
-    // Control points should stay within [topX, bottomX]
-    const cp3x = Math.max(Math.min(topX + handleReach, bottomX), topX);
+    const cp3x = topX + handleReach;
     const cp3y = 0;
-    const cp4x = Math.min(Math.max(bottomX - handleReach, topX), bottomX);
+    const cp4x = bottomX - handleReach;
     const cp4y = waveHeight * 2;
     
     pathData += ` C ${formatSVGNumber(cp3x)} ${formatSVGNumber(cp3y)}, ${formatSVGNumber(cp4x)} ${formatSVGNumber(cp4y)}, ${formatSVGNumber(bottomX)} ${formatSVGNumber(bottomY)}`;
