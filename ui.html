@@ -244,6 +244,58 @@
       drawWave();
     });
 
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function lerpPt(p0, p1, t) { return { x: lerp(p0.x, p1.x, t), y: lerp(p0.y, p1.y, t) }; }
+    function cubicPoint(p0, p1, p2, p3, t) {
+      const mt = 1 - t;
+      const a = mt * mt * mt;
+      const b = 3 * mt * mt * t;
+      const c = 3 * mt * t * t;
+      const d = t * t * t;
+      return {
+        x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
+        y: a * p0.y + b * p1.y + c * p2.y + d * p3.y,
+      };
+    }
+    function splitCubic(p0, p1, p2, p3, t) {
+      const p01 = lerpPt(p0, p1, t);
+      const p12 = lerpPt(p1, p2, t);
+      const p23 = lerpPt(p2, p3, t);
+      const p012 = lerpPt(p01, p12, t);
+      const p123 = lerpPt(p12, p23, t);
+      const pm = lerpPt(p012, p123, t);
+      return [ [p0, p01, p012, pm], [pm, p123, p23, p3] ];
+    }
+    function solveTForY(p0, p1, p2, p3, targetY) {
+      // Validate that the curve actually crosses the target Y
+      const yAtStart = cubicPoint(p0, p1, p2, p3, 0).y;
+      const yAtEnd = cubicPoint(p0, p1, p2, p3, 1).y;
+      
+      // Ensure target is between start and end Y values
+      if ((yAtStart > targetY && yAtEnd > targetY) || (yAtStart < targetY && yAtEnd < targetY)) {
+        // Fallback: return midpoint if curve doesn't cross targetY
+        // This should not happen with normal wave parameters
+        return 0.5;
+      }
+      
+      // Determine if curve is ascending (low to high Y) or descending (high to low Y)
+      const isAscending = yAtStart < yAtEnd;
+      
+      let lo = 0, hi = 1;
+      for (let i = 0; i < 22; i++) {
+        const mid = (lo + hi) / 2;
+        const y = cubicPoint(p0, p1, p2, p3, mid).y;
+        if (isAscending) {
+          // Curve goes from low Y to high Y: if y < targetY, search higher t
+          if (y < targetY) lo = mid; else hi = mid;
+        } else {
+          // Curve goes from high Y to low Y: if y > targetY, search higher t
+          if (y > targetY) lo = mid; else hi = mid;
+        }
+      }
+      return (lo + hi) / 2;
+    }
+
     // Draw the wave preview
     function drawWave() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -286,21 +338,41 @@
         // Roundness determines how far along toward the next point the handles reach
         const handleReach = roundnessPercent * (scaledWaveLength / 2);
         
-        // First curve: bottom to top
-        const cp1x = waveStartX + handleReach;
-        const cp1y = bottomY;
-        const cp2x = topX - handleReach;
-        const cp2y = topY;
+        // Define points for both cubics
+        const p0 = { x: waveStartX, y: bottomY };
+        const p1 = { x: waveStartX + handleReach, y: bottomY };
+        const p2 = { x: topX - handleReach, y: topY };
+        const p3 = { x: topX, y: topY };
+
+        const q0 = { x: topX, y: topY };
+        const q1 = { x: topX + handleReach, y: topY };
+        const q2 = { x: waveEndX - handleReach, y: bottomY };
+        const q3 = { x: waveEndX, y: bottomY };
+
+        // Middle Y coordinate where we want to insert a node
+        const middleY = centerY;
+
+        function emitC(a1, a2, a3) {
+          ctx.bezierCurveTo(a1.x, a1.y, a2.x, a2.y, a3.x, a3.y);
+        }
+
+        // First curve goes from bottom to top
+        // Split it at middle Y to add midpoint node
+        const tMiddle = solveTForY(p0, p1, p2, p3, middleY);
+        const [leftToMiddle, middleToTop] = splitCubic(p0, p1, p2, p3, tMiddle);
+        // Emit first half: from bottom to middle Y
+        emitC(leftToMiddle[1], leftToMiddle[2], leftToMiddle[3]);
+        // Emit second half: from middle Y to top (y = topY) - explicit node at y=topY when going up
+        emitC(middleToTop[1], middleToTop[2], middleToTop[3]);
         
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, topX, topY);
-        
-        // Second curve: top to bottom
-        const cp3x = topX + handleReach;
-        const cp3y = topY;
-        const cp4x = waveEndX - handleReach;
-        const cp4y = bottomY;
-        
-        ctx.bezierCurveTo(cp3x, cp3y, cp4x, cp4y, waveEndX, bottomY);
+        // Second curve goes from top to bottom
+        // Split it at middle Y to add midpoint node when going down
+        const tMiddleDown = solveTForY(q0, q1, q2, q3, middleY);
+        const [topToMiddle, middleToBottom] = splitCubic(q0, q1, q2, q3, tMiddleDown);
+        // Emit first half: from top to middle Y (explicit node at y=middleY when going down)
+        emitC(topToMiddle[1], topToMiddle[2], topToMiddle[3]);
+        // Emit second half: from middle Y to bottom
+        emitC(middleToBottom[1], middleToBottom[2], middleToBottom[3]);
       }
       
       ctx.stroke();

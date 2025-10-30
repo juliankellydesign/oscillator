@@ -13,6 +13,18 @@ figma.ui.onmessage = (msg: { type: string; params?: any }) => {
   if (msg.type === 'generate-wave') {
     const params = msg.params;
     
+    // Validate parameters
+    if (!params || 
+        typeof params.waveLength !== 'number' || params.waveLength <= 0 ||
+        typeof params.waveHeight !== 'number' || params.waveHeight <= 0 ||
+        typeof params.waveRoundness !== 'number' ||
+        typeof params.waveOffset !== 'number' ||
+        typeof params.numWaves !== 'number' || params.numWaves <= 0 || !Number.isInteger(params.numWaves)) {
+      console.error('Invalid wave parameters:', params);
+      figma.closePlugin();
+      return;
+    }
+    
     // Create a vector path
     const vectorPath = figma.createVector();
     
@@ -54,6 +66,72 @@ function formatSVGNumber(num: number): string {
   return Math.round(num * 100) / 100 + '';
 }
 
+type Point = { x: number; y: number };
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function lerpPt(p0: Point, p1: Point, t: number): Point {
+  return { x: lerp(p0.x, p1.x, t), y: lerp(p0.y, p1.y, t) };
+}
+
+function cubicPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
+  const mt = 1 - t;
+  const a = mt * mt * mt;
+  const b = 3 * mt * mt * t;
+  const c = 3 * mt * t * t;
+  const d = t * t * t;
+  return {
+    x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
+    y: a * p0.y + b * p1.y + c * p2.y + d * p3.y,
+  };
+}
+
+function splitCubic(p0: Point, p1: Point, p2: Point, p3: Point, t: number): [Point[], Point[]] {
+  const p01 = lerpPt(p0, p1, t);
+  const p12 = lerpPt(p1, p2, t);
+  const p23 = lerpPt(p2, p3, t);
+  const p012 = lerpPt(p01, p12, t);
+  const p123 = lerpPt(p12, p23, t);
+  const pm = lerpPt(p012, p123, t);
+  return [
+    [p0, p01, p012, pm],
+    [pm, p123, p23, p3],
+  ];
+}
+
+function solveTForY(p0: Point, p1: Point, p2: Point, p3: Point, targetY: number): number {
+  // Validate that the curve actually crosses the target Y
+  const yAtStart = cubicPoint(p0, p1, p2, p3, 0).y;
+  const yAtEnd = cubicPoint(p0, p1, p2, p3, 1).y;
+  
+  // Ensure target is between start and end Y values
+  if ((yAtStart > targetY && yAtEnd > targetY) || (yAtStart < targetY && yAtEnd < targetY)) {
+    // Fallback: return midpoint if curve doesn't cross targetY
+    // This should not happen with normal wave parameters
+    return 0.5;
+  }
+  
+  // Determine if curve is ascending (low to high Y) or descending (high to low Y)
+  const isAscending = yAtStart < yAtEnd;
+  
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 22; i++) {
+    const mid = (lo + hi) / 2;
+    const y = cubicPoint(p0, p1, p2, p3, mid).y;
+    if (isAscending) {
+      // Curve goes from low Y to high Y: if y < targetY, search higher t
+      if (y < targetY) lo = mid; else hi = mid;
+    } else {
+      // Curve goes from high Y to low Y: if y > targetY, search higher t
+      if (y > targetY) lo = mid; else hi = mid;
+    }
+  }
+  return (lo + hi) / 2;
+}
+
 function generateWavePath(params: { waveLength: number; waveHeight: number; waveRoundness: number; waveOffset: number; numWaves: number }) {
   const numWaves = params.numWaves;
   const waveLength = params.waveLength;
@@ -70,10 +148,10 @@ function generateWavePath(params: { waveLength: number; waveHeight: number; wave
   // Generate each wave segment
   for (let i = 0; i < numWaves; i++) {
     const waveStartX = i * waveLength;
-    const waveMidX = waveStartX + waveLength / 2;
     const waveEndX = waveStartX + waveLength;
     
     // Top point (shifted by offset)
+    const waveMidX = waveStartX + waveLength / 2;
     const topXOffset = offset * waveLength;
     const topX = waveMidX + topXOffset;
     const topY = 0;
@@ -85,21 +163,41 @@ function generateWavePath(params: { waveLength: number; waveHeight: number; wave
     // Calculate bezier handle positions
     const handleReach = roundness * (waveLength / 2);
     
-    // First curve: from wave start to top point
-    const cp1x = waveStartX + handleReach;
-    const cp1y = waveHeight * 2;
-    const cp2x = topX - handleReach;
-    const cp2y = 0;
+    // Define control points as Points for both cubics
+    const p0: Point = { x: waveStartX, y: bottomY };
+    const p1: Point = { x: waveStartX + handleReach, y: bottomY };
+    const p2: Point = { x: topX - handleReach, y: topY };
+    const p3: Point = { x: topX, y: topY };
 
-    pathData += ` C ${formatSVGNumber(cp1x)} ${formatSVGNumber(cp1y)} ${formatSVGNumber(cp2x)} ${formatSVGNumber(cp2y)} ${formatSVGNumber(topX)} ${formatSVGNumber(topY)}`;
+    const q0: Point = { x: topX, y: topY };
+    const q1: Point = { x: topX + handleReach, y: topY };
+    const q2: Point = { x: bottomX - handleReach, y: bottomY };
+    const q3: Point = { x: bottomX, y: bottomY };
 
-    // Second curve: from top point to wave end
-    const cp3x = topX + handleReach;
-    const cp3y = 0;
-    const cp4x = bottomX - handleReach;
-    const cp4y = waveHeight * 2;
+    // Middle Y coordinate where we want to insert a node
+    const middleY = waveHeight;
 
-    pathData += ` C ${formatSVGNumber(cp3x)} ${formatSVGNumber(cp3y)} ${formatSVGNumber(cp4x)} ${formatSVGNumber(cp4y)} ${formatSVGNumber(bottomX)} ${formatSVGNumber(bottomY)}`;
+    function emitC(a1: Point, a2: Point, a3: Point) {
+      pathData += ` C ${formatSVGNumber(a1.x)} ${formatSVGNumber(a1.y)} ${formatSVGNumber(a2.x)} ${formatSVGNumber(a2.y)} ${formatSVGNumber(a3.x)} ${formatSVGNumber(a3.y)}`;
+    }
+
+    // First curve goes from bottom (y = waveHeight * 2) to top (y = 0)
+    // Split it at middle Y (waveHeight) to add midpoint node
+    const tMiddle = solveTForY(p0, p1, p2, p3, middleY);
+    const [leftToMiddle, middleToTop] = splitCubic(p0, p1, p2, p3, tMiddle);
+    // Emit first half: from bottom to middle Y
+    emitC(leftToMiddle[1], leftToMiddle[2], leftToMiddle[3]);
+    // Emit second half: from middle Y to top (y = 0) - explicit node at y=0 when going up
+    emitC(middleToTop[1], middleToTop[2], middleToTop[3]);
+    
+    // Second curve goes from top (y = 0) to bottom (y = waveHeight * 2)
+    // Split it at middle Y (waveHeight) to add midpoint node when going down
+    const tMiddleDown = solveTForY(q0, q1, q2, q3, middleY);
+    const [topToMiddle, middleToBottom] = splitCubic(q0, q1, q2, q3, tMiddleDown);
+    // Emit first half: from top to middle Y (explicit node at y=waveHeight when going down)
+    emitC(topToMiddle[1], topToMiddle[2], topToMiddle[3]);
+    // Emit second half: from middle Y to bottom
+    emitC(middleToBottom[1], middleToBottom[2], middleToBottom[3]);
   }
   
   return {
